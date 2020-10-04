@@ -1,5 +1,1 @@
-# if true {
-  Print("Hello World")
-} #
-
-Array.Int:fibonacci [1,2,2,3,5,8,13,21]
+Print(Length([1,2,6,9,5,4,1]))

@@ -65,7 +65,7 @@ const lexer = moo.compile({
 })
 
 function arithmetic(type, data) {
-  return { operation: "arithmetic", type, left: data[0], right: data[4] }
+  return { operation: "arithmetic", type, left: data[0], right: data[4], position: data[0].position }
 }
 
 function primitive(type, data) {

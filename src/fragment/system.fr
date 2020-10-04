@@ -1,5 +1,3 @@
-use [JSPort] from "JSPort"
-
 Function.Int:Lt (Int n1, Int n2) {
 	provide JSPort<"Lt">(n1, n2)
 }
@@ -40,6 +38,6 @@ Function.Int:Length (Array.Occult array) {
 	provide JSPort<"Length">(array)
 }
 
-Array.Function.Int:Exprts [Lt, Lte, Gt, Gte, Equals, And, Nand, Or, Nor, Length]
-
-provide Exports
+Function.Occult:Print (Occult message) {
+	JSPort<"Print">(message)
+}

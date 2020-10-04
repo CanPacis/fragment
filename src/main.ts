@@ -1,11 +1,12 @@
 import Fragment from "./engine";
 import Path from "path";
 
+let system = new Fragment(Path.join(process.cwd(), "src/fragment/system.fr"));
 let instance = new Fragment(Path.join(process.cwd(), "src/fragment/main.fr"));
-// console.log(instance.parsedContent.program[0])
 
-instance.parsedContent.program.forEach((statement) => {
-  instance.resolveStatement(statement, instance.frame);
-});
+system.type = "system";
+system.resolveProgram();
+// delete system.frame.JSPort
 
-console.log(instance.frame);
+instance.frame = { ...instance.frame, ...system.frame }
+instance.resolveProgram()
