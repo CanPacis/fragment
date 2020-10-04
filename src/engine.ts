@@ -4,7 +4,6 @@ import Language from "./grammar";
 import Path from "path";
 import chalk from "chalk";
 import { Statement } from "typescript";
-import { exit } from "process";
 
 namespace Use {
   export interface Statement {

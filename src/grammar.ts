@@ -1,8 +1,13 @@
 // @ts-nocheck
 // Generated automatically by nearley, version 2.19.7
 // http://github.com/Hardmath123/nearley
-(function () {
-function id(x) { return x[0]; }
+// Bypasses TS6133. Allow declared but unused functions.
+// @ts-ignore
+function id(d: any[]): any { return d[0]; }
+declare var NumberLiteral: any;
+declare var StringLiteral: any;
+declare var VariableType: any;
+declare var Identifier: any;
 
 
 const moo = require("moo")
@@ -71,18 +76,45 @@ function position(data) {
   return { line: data[0].line, col: data[0].col }
 }
 
-var grammar = {
-    Lexer: lexer,
-    ParserRules: [
+
+interface NearleyToken {  value: any;
+  [key: string]: any;
+};
+
+interface NearleyLexer {
+  reset: (chunk: string, info: any) => void;
+  next: () => NearleyToken | undefined;
+  save: () => any;
+  formatError: (token: NearleyToken) => string;
+  has: (tokenType: string) => boolean;
+};
+
+interface NearleyRule {
+  name: string;
+  symbols: NearleySymbol[];
+  postprocess?: (d: any[], loc?: number, reject?: {}) => any;
+};
+
+type NearleySymbol = string | { literal: any } | { test: (token: any) => boolean };
+
+interface Grammar {
+  Lexer: NearleyLexer | undefined;
+  ParserRules: NearleyRule[];
+  ParserStart: string;
+};
+
+const grammar: Grammar = {
+  Lexer: lexer,
+  ParserRules: [
     {"name": "Program$ebnf$1", "symbols": []},
     {"name": "Program$ebnf$1$subexpression$1", "symbols": ["UseStatement", "_"], "postprocess": id},
-    {"name": "Program$ebnf$1", "symbols": ["Program$ebnf$1", "Program$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "Program$ebnf$1", "symbols": ["Program$ebnf$1", "Program$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "Program$ebnf$2", "symbols": []},
     {"name": "Program$ebnf$2$subexpression$1", "symbols": ["Main", "_"], "postprocess": id},
-    {"name": "Program$ebnf$2", "symbols": ["Program$ebnf$2", "Program$ebnf$2$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "Program$ebnf$2", "symbols": ["Program$ebnf$2", "Program$ebnf$2$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "Program$ebnf$3$subexpression$1", "symbols": ["ProvideStatement", "_"], "postprocess": id},
     {"name": "Program$ebnf$3", "symbols": ["Program$ebnf$3$subexpression$1"], "postprocess": id},
-    {"name": "Program$ebnf$3", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "Program$ebnf$3", "symbols": [], "postprocess": () => null},
     {"name": "Program", "symbols": ["_", "Program$ebnf$1", "Program$ebnf$2", "Program$ebnf$3"], "postprocess": d => ({ uses: d[1], program: d[2], provides: d[3] })},
     {"name": "Main", "symbols": ["VariableDeclaration"], "postprocess": id},
     {"name": "Main", "symbols": ["MainExpression"], "postprocess": id},
@@ -92,7 +124,7 @@ var grammar = {
     {"name": "Main", "symbols": ["IfStatement"], "postprocess": id},
     {"name": "Main", "symbols": ["Comment"], "postprocess": id},
     {"name": "Comment$ebnf$1", "symbols": []},
-    {"name": "Comment$ebnf$1", "symbols": ["Comment$ebnf$1", /[^#]/], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "Comment$ebnf$1", "symbols": ["Comment$ebnf$1", /[^#]/], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "Comment", "symbols": [{"literal":"#"}, "Comment$ebnf$1", {"literal":"#"}], "postprocess":  d => ({ 
           operation: "comment", 
           value: d[1]?.map(d => d.value).join(""),
@@ -109,7 +141,7 @@ var grammar = {
     {"name": "ProvideStatement", "symbols": [{"literal":"provide"}, "__", "MainExpression"], "postprocess": d => d[2]},
     {"name": "EmbodyStatement$ebnf$1$subexpression$1", "symbols": ["ArgumentList", "_"], "postprocess": id},
     {"name": "EmbodyStatement$ebnf$1", "symbols": ["EmbodyStatement$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "EmbodyStatement$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "EmbodyStatement$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "EmbodyStatement", "symbols": [{"literal":"embody"}, "__", "Expression", "_", {"literal":"{"}, "EmbodyStatement$ebnf$1", {"literal":"}"}], "postprocess":  d => ({ 
           operation: "embody_statement", 
           name: d[2], 
@@ -154,7 +186,7 @@ var grammar = {
         }) },
     {"name": "FunctionCall$ebnf$1$subexpression$1", "symbols": ["ArgumentList", "_"], "postprocess": id},
     {"name": "FunctionCall$ebnf$1", "symbols": ["FunctionCall$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "FunctionCall$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "FunctionCall$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "FunctionCall", "symbols": ["Expression", "_", {"literal":"("}, "FunctionCall$ebnf$1", {"literal":")"}], "postprocess":  d => ({ 
           operation: "function_call", 
           name: d[0], 
@@ -178,13 +210,13 @@ var grammar = {
     {"name": "KeyedArgumentList", "symbols": ["String", "_", {"literal":":"}, "_", "MainExpression", "_", {"literal":","}, "_", "KeyedArgumentList"], "postprocess": d => [{ key: d[0], value: d[4] }, d[8]]},
     {"name": "KeyedArgumentList", "symbols": ["String", "_", {"literal":":"}, "_", "MainExpression"], "postprocess": d => [{ key: d[0], value: d[4] }]},
     {"name": "ParameterList$ebnf$1", "symbols": [{"literal":"?"}], "postprocess": id},
-    {"name": "ParameterList$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "ParameterList$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "ParameterList", "symbols": ["variable_type", "__", "identifier", "ParameterList$ebnf$1", "_", {"literal":","}, "_", "ParameterList"], "postprocess":  d => [
           { sort: d[0], value: d[2].value, isOptional: d[3] !== null }, 
           d[7]
         ] },
     {"name": "ParameterList$ebnf$2", "symbols": [{"literal":"?"}], "postprocess": id},
-    {"name": "ParameterList$ebnf$2", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "ParameterList$ebnf$2", "symbols": [], "postprocess": () => null},
     {"name": "ParameterList", "symbols": ["variable_type", "__", "identifier", "ParameterList$ebnf$2"], "postprocess":  d => [
           { sort: d[0], value: d[2].value, isOptional: d[3] !== null }
         ] },
@@ -197,33 +229,33 @@ var grammar = {
     {"name": "Primitive", "symbols": ["Ark"], "postprocess": id},
     {"name": "CodeBlock$ebnf$1", "symbols": []},
     {"name": "CodeBlock$ebnf$1$subexpression$1", "symbols": ["Main", "_"], "postprocess": id},
-    {"name": "CodeBlock$ebnf$1", "symbols": ["CodeBlock$ebnf$1", "CodeBlock$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "CodeBlock$ebnf$1", "symbols": ["CodeBlock$ebnf$1", "CodeBlock$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "CodeBlock", "symbols": [{"literal":"{"}, "_", "CodeBlock$ebnf$1", {"literal":"}"}], "postprocess": d => d[2] || []},
     {"name": "FunctionCodeBlock$ebnf$1", "symbols": []},
     {"name": "FunctionCodeBlock$ebnf$1$subexpression$1", "symbols": ["Main", "_"], "postprocess": id},
-    {"name": "FunctionCodeBlock$ebnf$1", "symbols": ["FunctionCodeBlock$ebnf$1", "FunctionCodeBlock$ebnf$1$subexpression$1"], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "FunctionCodeBlock$ebnf$1", "symbols": ["FunctionCodeBlock$ebnf$1", "FunctionCodeBlock$ebnf$1$subexpression$1"], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "FunctionCodeBlock$ebnf$2$subexpression$1", "symbols": ["ProvideStatement", "_"], "postprocess": id},
     {"name": "FunctionCodeBlock$ebnf$2", "symbols": ["FunctionCodeBlock$ebnf$2$subexpression$1"], "postprocess": id},
-    {"name": "FunctionCodeBlock$ebnf$2", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "FunctionCodeBlock$ebnf$2", "symbols": [], "postprocess": () => null},
     {"name": "FunctionCodeBlock", "symbols": [{"literal":"{"}, "_", "FunctionCodeBlock$ebnf$1", "FunctionCodeBlock$ebnf$2", {"literal":"}"}], "postprocess": d => ({ body: d[2] || [], provides: d[3] })},
     {"name": "Ark", "symbols": [{"literal":"Ark"}, {"literal":"{"}, "Program", {"literal":"}"}], "postprocess": d => primitive("Ark", { ...d[2] })},
     {"name": "Array$ebnf$1$subexpression$1", "symbols": ["ArgumentList", "_"], "postprocess": id},
     {"name": "Array$ebnf$1", "symbols": ["Array$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "Array$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "Array$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "Array", "symbols": [{"literal":"["}, "Array$ebnf$1", {"literal":"]"}], "postprocess":  d => primitive("Array", { 
           values: d[1]?.flat(Number.POSITIVE_INFINITY) || [],
           position: { line: d[0].line, col: d[0].col }
         }) },
     {"name": "Record$ebnf$1$subexpression$1", "symbols": ["KeyedArgumentList", "_"], "postprocess": id},
     {"name": "Record$ebnf$1", "symbols": ["Record$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "Record$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "Record$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "Record", "symbols": [{"literal":"{"}, "_", "Record$ebnf$1", {"literal":"}"}], "postprocess":  d => primitive("Record", { 
           values: d[2]?.flat(Number.POSITIVE_INFINITY) || [],
           position: { line: d[0].line, col: d[0].col }
         }) },
     {"name": "Function$ebnf$1$subexpression$1", "symbols": ["ParameterList", "_"], "postprocess": id},
     {"name": "Function$ebnf$1", "symbols": ["Function$ebnf$1$subexpression$1"], "postprocess": id},
-    {"name": "Function$ebnf$1", "symbols": [], "postprocess": function(d) {return null;}},
+    {"name": "Function$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "Function", "symbols": [{"literal":"("}, "Function$ebnf$1", {"literal":")"}, "_", "FunctionCodeBlock"], "postprocess":  d => primitive("Function", { 
           parameters: d[1]?.flat(Number.POSITIVE_INFINITY) || [],
           body: d[4].body,
@@ -246,17 +278,13 @@ var grammar = {
     {"name": "variable_type", "symbols": [{"literal":"Array"}, {"literal":"."}, "variable_type"], "postprocess": d => ({ type: "Array", of: d[2], position: position(d) })},
     {"name": "identifier", "symbols": [(lexer.has("Identifier") ? {type: "Identifier"} : Identifier)], "postprocess": id},
     {"name": "_$ebnf$1", "symbols": []},
-    {"name": "_$ebnf$1", "symbols": ["_$ebnf$1", /[\s]/], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "_$ebnf$1", "symbols": ["_$ebnf$1", /[\s]/], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "_", "symbols": ["_$ebnf$1"], "postprocess": (d) =>  null},
     {"name": "__$ebnf$1", "symbols": [/[\s]/]},
-    {"name": "__$ebnf$1", "symbols": ["__$ebnf$1", /[\s]/], "postprocess": function arrpush(d) {return d[0].concat([d[1]]);}},
+    {"name": "__$ebnf$1", "symbols": ["__$ebnf$1", /[\s]/], "postprocess": (d) => d[0].concat([d[1]])},
     {"name": "__", "symbols": ["__$ebnf$1"], "postprocess": (d) =>  null}
-]
-  , ParserStart: "Program"
-}
-if (typeof module !== 'undefined'&& typeof module.exports !== 'undefined') {
-   module.exports = grammar;
-} else {
-   window.grammar = grammar;
-}
-})();
+  ],
+  ParserStart: "Program",
+};
+
+export default grammar;

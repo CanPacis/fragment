@@ -14,7 +14,7 @@
   "devDependencies": {},
   "scripts": {
     "dev": "tsc --watch",
-    "compile-grammar": "nearleyc src/grammar.ne -o src/grammar.js"
+    "compile-grammar": "nearleyc src/grammar.ne -o src/grammar.ts"
   },
   "keywords": [],
   "author": "",

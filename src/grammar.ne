@@ -68,6 +68,7 @@ function position(data) {
 
 %}
 
+@preprocessor typescript
 @lexer lexer
 
 Program 
