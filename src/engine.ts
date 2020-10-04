@@ -192,7 +192,7 @@ namespace Statement {
   export interface Use {
     operation: "use_statement";
     source: string;
-    use: string[];
+    use: string[] | "All";
     position: Misc.Position;
   }
 
@@ -301,9 +301,36 @@ export default class Fragment {
         let instance = new Fragment(Path.join(this.parsedPath.dir, dependency.source));
         instance.run();
         this.dependencies.push(instance);
-        this.frame = { ...this.frame, ...instance.frame };
+        let subframe: Misc.Frame = {};
+
+        if (dependency.use === "All") {
+          subframe = instance.frame;
+        } else {
+          dependency.use.forEach((use) => {
+            let value = instance.frame[use];
+            if (value) {
+              subframe[use] = value;
+            } else {
+              new FragmentError(
+                this,
+                Fragment.ErrorMessage.UndeclaredVariable,
+                `Use statement is trying to use a variable that is not provided. Variable '${use}' is not usable`,
+                dependency.position
+              ).throw();
+              process.exit();
+            }
+          });
+        }
+        this.frame = { ...this.frame, ...subframe };
       }
     });
+  }
+
+  checkTypes(
+    primtive: Primitive.FragmentArrayRepresentation | Primitive.FragmentRecordRepresentation,
+    type: Misc.Sort<Misc.Type>
+  ): Boolean {
+    console.log(primtive, type)
   }
 
   resolveStatement(statement: Statement.All, frame: Misc.Frame): Primitive.AllRepresentation {
@@ -318,38 +345,41 @@ export default class Fragment {
           var value = this.resolveExpression(statement.value, frame);
 
           if (value.sort.type === "Array") {
-            let values = (statement.value as Primitive.FragmentArray).values;
+            console.log(value, statement.sort)
+            console.log(this.checkTypes(value as Primitive.FragmentArrayRepresentation, statement.sort))
+            let values = (value as Primitive.FragmentArrayRepresentation).values;
 
-            values.forEach((element) => {
-              let e = this.resolveExpression(element, frame);
-
-              if (e.sort.type === statement.sort.of?.type) {
+            values.forEach((element, i) => {
+              if (Fragment.DiffTypes(element.sort, statement.sort.of)) {
                 value.sort = statement.sort as Misc.Sort<"Array">;
               } else {
                 new FragmentError(
                   this,
                   Fragment.ErrorMessage.TypeMiscmatch,
-                  `Type '${e.sort.type}' is not assignable to type '${statement.sort.type}.${statement.sort.of?.type}'`,
-                  element.position as Misc.Position
+                  `Type '${Fragment.ResolveSort(
+                    element.sort
+                  )}' is not assignable to type '${Fragment.ResolveSort(statement.sort.of)}'`,
+                  statement.sort.position as Misc.Position
                 ).throw();
                 process.exit();
               }
             });
           } else if (value.sort.type === "Record") {
+            // this.checkTypes(value as Primitive.FragmentRecordRepresentation, statement.sort);
+
             let used: string[] = [];
-            let values = (statement.value as Primitive.FragmentRecord).values;
+            let values = (value as Primitive.FragmentRecordRepresentation).values;
             if (values.length > 0) {
               values.forEach((element) => {
-                let e = this.resolveExpression(element.value, frame);
-
-                if (e.sort.type === statement.sort.of?.type) {
-                  let key = (element.key as Primitive.FragmentString).value;
+                if (Fragment.DiffTypes(element.value.sort, statement.sort.of)) {
+                  let key = (element.key as Primitive.FragmentStringRepresentation).value;
                   if (used.includes(key)) {
                     new FragmentError(
                       this,
                       Fragment.ErrorMessage.DuplicateElement,
                       `Records cannot have duplicate keys`,
-                      element.key.position
+                      // element.key.position
+                      { line: 1, col: 1 }
                     ).throw();
                     process.exit();
                   } else {
@@ -360,8 +390,10 @@ export default class Fragment {
                   new FragmentError(
                     this,
                     Fragment.ErrorMessage.TypeMiscmatch,
-                    `Type '${e.sort.type}' is not assignable to type '${statement.sort.type}.${statement.sort.of?.type}'`,
-                    element.value.position as Misc.Position
+                    `Type '${Fragment.ResolveSort(
+                      element.value.sort
+                    )}' is not assignable to type '${Fragment.ResolveSort(statement.sort)}'`,
+                    statement.sort.position as Misc.Position
                   ).throw();
                   process.exit();
                 }
@@ -380,7 +412,9 @@ export default class Fragment {
             new FragmentError(
               this,
               Fragment.ErrorMessage.TypeMiscmatch,
-              `Type '${value.sort.type}' is not assignable to type '${statement.sort.type}'`,
+              `Type '${Fragment.ResolveSort(
+                value.sort
+              )}' is not assignable to type '${Fragment.ResolveSort(statement.sort)}'`,
               statement.sort.position as Misc.Position
             ).throw();
             process.exit();
@@ -696,6 +730,8 @@ export default class Fragment {
                     ).throw();
                     process.exit();
                   }
+                } else {
+                  return Fragment.GeneratePrimitive("Occult", 0);
                 }
               } else {
                 new FragmentError(
@@ -763,26 +799,26 @@ export default class Fragment {
     }
   }
 
-  static DiffTypes(sort1: Misc.Sort<Misc.Type>, sort2: Misc.Sort<Misc.Type>): Boolean {
+  static DiffTypes(sort1: Misc.Sort<Misc.Type>, sort2: Misc.Sort<Misc.Type> | undefined): Boolean {
     if (["String", "Boolean", "Int", "Double", "Occult"].includes(sort1.type)) {
       if (
-        (sort1.type === "Occult" && sort2.type !== "Occult") ||
-        (sort2.type === "Occult" && sort1.type !== "Occult")
+        (sort1.type === "Occult" && sort2?.type !== "Occult") ||
+        (sort2?.type === "Occult" && sort1.type !== "Occult")
       ) {
         return true;
       }
-      return sort1.type === sort2.type;
+      return sort1.type === sort2?.type;
     } else {
-      if (sort1.of && sort2.of) {
-        if (sort1.type === sort2.type) {
+      if (sort1.of && sort2?.of) {
+        if (sort1.type === sort2?.type) {
           return Fragment.DiffTypes(sort1.of, sort2.of);
         } else {
           return false;
         }
       } else {
         if (
-          (sort1.of?.type === "Occult" && sort2.of?.type !== "Occult") ||
-          (sort2.of?.type === "Occult" && sort1.of?.type !== "Occult")
+          (sort1.of?.type === "Occult" && sort2?.of?.type !== "Occult") ||
+          (sort2?.of?.type === "Occult" && sort1.of?.type !== "Occult")
         ) {
           return true;
         }
@@ -839,13 +875,21 @@ export default class Fragment {
           .join(", ")} }`;
       case "Function":
         let params = (primitive as Primitive.FragmentFunctionRepresentation).parameters;
-        return `${chalk.hex("#1793ff").bold("Function")} (${params
-          .map((param) => `${chalk.hex("#1793ff").bold(param.sort.type)} ${param.value}`)
+        return `${chalk.hex("#b200ed").bold("Function")} (${params
+          .map((param) => `${Fragment.ResolveSort(param.sort)} ${param.value}`)
           .join(", ")}) { ... }`;
       case "Occult":
         return chalk.hex("#1793ff").bold("Occult");
       default:
         return "";
+    }
+  }
+
+  static ResolveSort(sort?: Misc.Sort<Misc.Type>): string {
+    if (sort?.of) {
+      return `${chalk.hex("#1793ff").bold(sort.type)}.${Fragment.ResolveSort(sort.of)}`;
+    } else {
+      return chalk.hex("#1793ff").bold(sort?.type);
     }
   }
 
@@ -883,6 +927,21 @@ export default class Fragment {
       } as unknown) as Primitive.NativeFunctionRepresentation
     },
     {
+      key: Fragment.GeneratePrimitive("String", "Equals"),
+      value: ({
+        body: [],
+        parameters: [],
+        provides: {},
+        native: true,
+        sort: { type: "Function", of: { type: "Boolean" } },
+        cb(n1: Primitive.FragmentNumberRepresentation, n2: Primitive.FragmentNumberRepresentation) {
+          return n1.value === n2.value
+            ? Fragment.GeneratePrimitive("Boolean", true)
+            : Fragment.GeneratePrimitive("Boolean", false);
+        }
+      } as unknown) as Primitive.NativeFunctionRepresentation
+    },
+    {
       key: Fragment.GeneratePrimitive("String", "Length"),
       value: ({
         body: [],
@@ -892,6 +951,19 @@ export default class Fragment {
         sort: { type: "Function", of: { type: "Int" } },
         cb(array: Primitive.FragmentArrayRepresentation) {
           return Fragment.GeneratePrimitive("Int", array.values.length);
+        }
+      } as unknown) as Primitive.NativeFunctionRepresentation
+    },
+    {
+      key: Fragment.GeneratePrimitive("String", "Type"),
+      value: ({
+        body: [],
+        parameters: [],
+        provides: {},
+        native: true,
+        sort: { type: "Function", of: { type: "String" } },
+        cb(value: Primitive.AllRepresentation) {
+          return Fragment.GeneratePrimitive("String", Fragment.ResolveSort(value.sort));
         }
       } as unknown) as Primitive.NativeFunctionRepresentation
     }

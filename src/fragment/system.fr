@@ -41,3 +41,7 @@ Function.Int:Length (Array.Occult array) {
 Function.Occult:Print (Occult message) {
 	JSPort<"Print">(message)
 }
+
+Function.String:Type (Occult data) {
+	provide JSPort<"Type">(data)
+}

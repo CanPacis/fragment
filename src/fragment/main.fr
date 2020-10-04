@@ -1,1 +1,22 @@
-Print({ "ali": 10.1, "veli": 10.5 })
+# use [array] from "./math.fr"
+
+
+
+Array.String:test list<0>()
+
+Print(test) #
+
+#
+Function.Array.Int:name () {
+	provide [5,6,1,12,7]
+} 
+
+
+Array.Function.Array.String:list [name]
+#
+
+# Record.Array.Int:test { "a": [1, 2] } # 
+
+# Record.Int:test { "a": 4 } #
+
+Array.Array.Array.Array.Int:test [[[[2]]]]
