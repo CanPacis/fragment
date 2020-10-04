@@ -1,6 +1,6 @@
 import { readFileSync, stat } from "fs";
 import { Grammar, Parser } from "nearley";
-import Language from "./grammar";
+import Language from "./grammar/grammar";
 import Path from "path";
 import chalk from "chalk";
 
@@ -254,8 +254,29 @@ export default class Fragment {
     this.file = this.parsedPath.base;
     this.content = readFileSync(path).toString();
     this.parser = new Parser(Grammar.fromCompiled(Language));
-    this.parser.feed(this.content);
-    this.parsedContent = this.parser.results[0];
+
+    try {
+      this.parser.feed(this.content);
+      this.parsedContent = this.parser.results[0];
+    } catch (error) {
+      let { line, col } = error.token;
+      new FragmentError(
+        this,
+        Fragment.ErrorMessage.SyntaxError,
+        error.message.split("\n")[4].split(". Instead")[0],
+        { line, col }
+      ).throw();
+      process.exit();
+    }
+  }
+
+  run() {
+    let system = new Fragment(Path.join(process.cwd(), "src/fragment/system.fr"));
+
+    system.type = "system";
+    system.resolveProgram();
+    this.frame = { ...this.frame, ...system.frame };
+    this.resolveProgram();
   }
 
   resolveProgram() {
@@ -277,7 +298,10 @@ export default class Fragment {
       if (dependency.source === "system") {
         console.log("system import");
       } else {
-        this.dependencies.push(new Fragment(Path.join(this.parsedPath.dir, dependency.source)));
+        let instance = new Fragment(Path.join(this.parsedPath.dir, dependency.source));
+        instance.run();
+        this.dependencies.push(instance);
+        this.frame = { ...this.frame, ...instance.frame };
       }
     });
   }
@@ -302,11 +326,12 @@ export default class Fragment {
               if (e.sort.type === statement.sort.of?.type) {
                 value.sort = statement.sort as Misc.Sort<"Array">;
               } else {
-                this.error(
+                new FragmentError(
+                  this,
                   Fragment.ErrorMessage.TypeMiscmatch,
                   `Type '${e.sort.type}' is not assignable to type '${statement.sort.type}.${statement.sort.of?.type}'`,
                   element.position as Misc.Position
-                );
+                ).throw();
                 process.exit();
               }
             });
@@ -320,22 +345,24 @@ export default class Fragment {
                 if (e.sort.type === statement.sort.of?.type) {
                   let key = (element.key as Primitive.FragmentString).value;
                   if (used.includes(key)) {
-                    this.error(
+                    new FragmentError(
+                      this,
                       Fragment.ErrorMessage.DuplicateElement,
                       `Records cannot have duplicate keys`,
                       element.key.position
-                    );
+                    ).throw();
                     process.exit();
                   } else {
                     used.push(key);
                     value.sort = statement.sort as Misc.Sort<"Record">;
                   }
                 } else {
-                  this.error(
+                  new FragmentError(
+                    this,
                     Fragment.ErrorMessage.TypeMiscmatch,
                     `Type '${e.sort.type}' is not assignable to type '${statement.sort.type}.${statement.sort.of?.type}'`,
                     element.value.position as Misc.Position
-                  );
+                  ).throw();
                   process.exit();
                 }
               });
@@ -350,11 +377,12 @@ export default class Fragment {
             frame[statement.name] = value;
             return Fragment.GeneratePrimitive("Int", 0);
           } else {
-            this.error(
+            new FragmentError(
+              this,
               Fragment.ErrorMessage.TypeMiscmatch,
               `Type '${value.sort.type}' is not assignable to type '${statement.sort.type}'`,
               statement.sort.position as Misc.Position
-            );
+            ).throw();
             process.exit();
           }
         case "quantity_modifier":
@@ -369,11 +397,12 @@ export default class Fragment {
                 break;
             }
           } else {
-            this.error(
+            new FragmentError(
+              this,
               Fragment.ErrorMessage.TypeMiscmatch,
               `Type '${value.sort.type}' cannot be incremented`,
               statement.statement.position as Misc.Position
-            );
+            ).throw();
             process.exit();
           }
           return Fragment.GeneratePrimitive("Int", 0);
@@ -400,13 +429,14 @@ export default class Fragment {
             };
 
             let exit = () => {
-              this.error(
+              new FragmentError(
+                this,
                 Fragment.ErrorMessage.TypeMiscmatch,
                 `Type '${value.sort.type}' cannot be reassigned with type '${
                   value.sort.type === "Double" ? "Int" : "Double"
                 }'`,
                 statement.statement.position as Misc.Position
-              );
+              ).throw();
               process.exit();
             };
 
@@ -440,11 +470,12 @@ export default class Fragment {
                 }
             }
           } else {
-            this.error(
+            new FragmentError(
+              this,
               Fragment.ErrorMessage.TypeMiscmatch,
               `Type '${value.sort.type}' cannot be reassigned with type '${assignmet.sort.type}'`,
               statement.statement.position as Misc.Position
-            );
+            ).throw();
             process.exit();
           }
           return Fragment.GeneratePrimitive("Int", 0);
@@ -456,20 +487,22 @@ export default class Fragment {
               this.resolveStatement(statement, frame);
             });
           } else {
-            this.error(
+            new FragmentError(
+              this,
               Fragment.ErrorMessage.TypeMiscmatch,
               `Cannot perform if statement with a type '${condition.sort.type}'`,
               statement.condition.position
-            );
+            ).throw();
             process.exit();
           }
           return Fragment.GeneratePrimitive("Int", 0);
         default:
-          this.error(
+          new FragmentError(
+            this,
             Fragment.ErrorMessage.UnknownStatement,
             `Statement '${statement.operation}' is not known`,
             { line: 1, col: 1 }
-          );
+          ).throw();
           process.exit();
       }
     }
@@ -481,11 +514,12 @@ export default class Fragment {
         if (frame[expression.value]) {
           return frame[expression.value];
         } else {
-          this.error(
+          new FragmentError(
+            this,
             Fragment.ErrorMessage.UndeclaredVariable,
             `Variable '${expression.value}' is not declared`,
             expression.position
-          );
+          ).throw();
           process.exit();
         }
       case "primitive":
@@ -506,21 +540,23 @@ export default class Fragment {
             if (value) {
               return value;
             } else {
-              this.error(
+              new FragmentError(
+                this,
                 Fragment.ErrorMessage.UndeclaredElement,
                 `The element ${
                   (index as Primitive.FragmentStringRepresentation).value
                 } is absent in record ${(expression.source as Primitive.FragmentString).value}`,
                 expression.index.position
-              );
+              ).throw();
               process.exit();
             }
           } else {
-            this.error(
+            new FragmentError(
+              this,
               Fragment.ErrorMessage.UnindexableType,
               `Type of 'Record' cannot be indexed with type '${index.sort.type}'`,
               expression.index.position
-            );
+            ).throw();
             process.exit();
           }
         } else if (source.sort.type === "Array") {
@@ -535,19 +571,21 @@ export default class Fragment {
             if (value) {
               return value;
             } else {
-              this.error(
+              new FragmentError(
+                this,
                 Fragment.ErrorMessage.UndeclaredElement,
                 `The given index is out of bounds`,
                 expression.index.position
-              );
+              ).throw();
               process.exit();
             }
           } else {
-            this.error(
+            new FragmentError(
+              this,
               Fragment.ErrorMessage.UnindexableType,
               `Type of 'Array' cannot be indexed with type '${index.sort.type}'`,
               expression.index.position
-            );
+            ).throw();
             process.exit();
           }
         } else {
@@ -581,19 +619,21 @@ export default class Fragment {
           if (expression.type === "addition") {
             return Fragment.GeneratePrimitive("String", l.value + r.value);
           } else {
-            this.error(
+            new FragmentError(
+              this,
               Fragment.ErrorMessage.UnperformableArithmetic,
               `Arithmetic ${expression.type} between ${left.sort.type} and ${right.sort.type} is inoperable`,
               expression.left.position
-            );
+            ).throw();
             process.exit();
           }
         } else {
-          this.error(
+          new FragmentError(
+            this,
             Fragment.ErrorMessage.UnperformableArithmetic,
             `Arithmetic ${expression.type} between ${left.sort.type} and ${right.sort.type} is inoperable`,
             expression.left.position
-          );
+          ).throw();
           process.exit();
         }
       case "function_call":
@@ -614,20 +654,22 @@ export default class Fragment {
                 if (Fragment.DiffTypes(args[i].sort, param.sort) || param.sort.type === "Occult") {
                   subframe = { ...subframe, [param.value]: args[i] };
                 } else {
-                  this.error(
+                  new FragmentError(
+                    this,
                     Fragment.ErrorMessage.TypeMiscmatch,
                     `Type '${args[i].sort.type}' is not valid for type '${param.sort.type}' in function argument for '${param.value}'`,
                     expression.arguments[i].position
-                  );
+                  ).throw();
                   process.exit();
                 }
               } else {
                 if (param.isOptional === false) {
-                  this.error(
+                  new FragmentError(
+                    this,
                     Fragment.ErrorMessage.AnticipatedArgument,
                     `Function you are trying to invoke needs an argument for '${param.value}'`,
                     expression.name.position
-                  );
+                  ).throw();
                   process.exit();
                 }
               }
@@ -646,30 +688,33 @@ export default class Fragment {
                   if (name.sort.of?.type === provide.sort.type) {
                     return provide;
                   } else {
-                    this.error(
+                    new FragmentError(
+                      this,
                       Fragment.ErrorMessage.TypeMiscmatch,
                       `A function of '${name.sort.of?.type}' cannot provide type '${provide.sort.type}'`,
                       name.provides.position
-                    );
+                    ).throw();
                     process.exit();
                   }
                 }
               } else {
-                this.error(
+                new FragmentError(
+                  this,
                   Fragment.ErrorMessage.TypeMiscmatch,
                   `A function of '${name.sort.of?.type}' should provide a type`,
                   expression.name.position
-                );
+                ).throw();
                 process.exit();
               }
             }
           }
         } else {
-          this.error(
+          new FragmentError(
+            this,
             Fragment.ErrorMessage.UncallableReference,
             `The type ${name.sort.type} is not a function I can invoke`,
             expression.name.position
-          );
+          ).throw();
           process.exit();
         }
     }
@@ -708,32 +753,14 @@ export default class Fragment {
           provides: primitive.provides
         } as Primitive.FragmentFunctionRepresentation;
       default:
-        this.error(
+        new FragmentError(
+          this,
           Fragment.ErrorMessage.UnknownType,
           `Type '${primitive.type}' is not known`,
           primitive.position
-        );
+        ).throw();
         process.exit();
     }
-  }
-
-  error(message: string, punchline: string, position: Misc.Position) {
-    // console.log(position, punchline);
-
-    let line = this.content.split("\n")[position.line - 1];
-    let t = (line.match(/\t/g) || []).length;
-    let spaces = Array(position.col - (t > 0 ? t + 1 : 0)).join(" ");
-    let tabs = Array(t * 8).join(" ");
-    console.log(
-      `${chalk.hex("#ff6161").bold("Captured Error:")} ${chalk
-        .hex("#bababa")
-        .bold(message)}.\n\n${punchline}\n${chalk.hex("#888888").bold(line)}\n${
-        tabs + spaces + "^"
-      }\n\n${
-        chalk.hex("#888888").bold("Error arose in ") +
-        chalk.hex("#1793ff").bold(`${this.file} ${position.line}:${position.col}`)
-      }`
-    );
   }
 
   static DiffTypes(sort1: Misc.Sort<Misc.Type>, sort2: Misc.Sort<Misc.Type>): Boolean {
@@ -778,7 +805,8 @@ export default class Fragment {
     UncallableReference: "Referenced variable is uncallable",
     TypeMiscmatch: "There is a type mismatch in given program",
     DuplicateElement: "There is duplicate of an element in given program",
-    AnticipatedArgument: "A function anticipated an argument"
+    AnticipatedArgument: "A function anticipated an argument",
+    SyntaxError: "There is a syntax error in give program"
   };
 
   static SerializePrimitive(primitive: Primitive.AllRepresentation): string {
@@ -809,6 +837,13 @@ export default class Fragment {
             (v) => `${Fragment.SerializePrimitive(v.key)} : ${Fragment.SerializePrimitive(v.value)}`
           )
           .join(", ")} }`;
+      case "Function":
+        let params = (primitive as Primitive.FragmentFunctionRepresentation).parameters;
+        return `${chalk.hex("#1793ff").bold("Function")} (${params
+          .map((param) => `${chalk.hex("#1793ff").bold(param.sort.type)} ${param.value}`)
+          .join(", ")}) { ... }`;
+      case "Occult":
+        return chalk.hex("#1793ff").bold("Occult");
       default:
         return "";
     }
@@ -861,4 +896,32 @@ export default class Fragment {
       } as unknown) as Primitive.NativeFunctionRepresentation
     }
   ];
+}
+
+class FragmentError {
+  constructor(
+    public instance: Fragment,
+    public message: string,
+    public punchline: string,
+    public position: Misc.Position
+  ) {}
+
+  throw() {
+    let line = this.instance.content.split("\n")[this.position.line - 1];
+    let t = (line.match(/\t/g) || []).length;
+    let spaces = Array(this.position.col - (t > 0 ? t + 1 : 0)).join(" ");
+    let tabs = Array(t * 8).join(" ");
+    console.log(
+      `${chalk.hex("#ff6161").bold("Captured Error:")} ${chalk
+        .hex("#bababa")
+        .bold(this.message)}.\n\n${this.punchline}\n${chalk.hex("#888888").bold(line)}\n${
+        tabs + spaces + "^"
+      }\n\n${
+        chalk.hex("#888888").bold("Error arose in ") +
+        chalk
+          .hex("#1793ff")
+          .bold(`${this.instance.file} ${this.position.line}:${this.position.col}`)
+      }`
+    );
+  }
 }

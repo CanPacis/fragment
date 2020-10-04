@@ -1,1 +1,1 @@
-Print(Length([1,2,6,9,5,4,1]))
+Print({ "ali": 10.1, "veli": 10.5 })
