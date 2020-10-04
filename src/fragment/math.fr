@@ -1,0 +1,23 @@
+Ark:Math Ark{
+	use [Lt, Lte, Length] from "system"
+
+	Function.Occult:init () {
+		Print("Math ark has been instantiated")
+	}
+
+	# Fibonacci function #
+	Function.Int:Fibonacci (Int n) {
+		if Lte(n, 1) { provide 1 }
+
+		provide Fibonacci(n - 1) + Fibonacci(n - 2)
+	}
+
+	# Factorial function #
+	Function.Int:Factorial (Int n) {
+		if Lt(n, 2) { provide 1 }
+
+		provide n * Factorial(n - 1)
+	}
+}
+
+provide [Math]

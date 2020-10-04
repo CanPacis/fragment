@@ -1,0 +1,5 @@
+# if true {
+  Print("Hello World")
+} #
+
+Array.Int:fibonacci [1,2,2,3,5,8,13,21]

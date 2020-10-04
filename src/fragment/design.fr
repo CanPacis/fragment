@@ -1,0 +1,59 @@
+add = (x, y) {
+  > x + y
+}
+
+x = 10
+y = 20
+
+provide add(x, y)
+
+//
+
+Function<Int> add = (Int x, Int y) [ x + y ]
+
+Int x = 10
+Int y = 20
+
+[add(x, y)]
+
+//
+
+Function.Int:add (Int x, Int y) [ x + y ]
+
+Int:x 10
+Int:y 20
+
+[add(x, y)]
+
+// 
+
+Function.Int:add (Int x, Int y) {
+  [x + y]
+}
+
+Int:x 10
+Int:y 20
+
+[add(x, y)]
+
+// 
+
+Function.Int:Add (Int x, Int y) {
+ <x + y> 
+}
+
+Int:x 10
+Int:y 20
+
+<Add(x, y)>
+
+//
+
+Function.Int:Add (Int x, Int y) {
+ provide x + y 
+}
+
+Int:x 10
+Int:y 20
+
+provide Add(x, y)

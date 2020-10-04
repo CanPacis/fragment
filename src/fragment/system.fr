@@ -1,0 +1,45 @@
+use [JSPort] from "JSPort"
+
+Function.Int:Lt (Int n1, Int n2) {
+	provide JSPort<"Lt">(n1, n2)
+}
+
+Function.Int:Lte (Int n1, Int n2) {
+	provide JSPort<"Lte">(n1, n2)
+}
+
+Function.Int:Gt (Int n1, Int n2) {
+	provide JSPort<"Gt">(n1, n2)
+}
+
+Function.Int:Gte (Int n1, Int n2) {
+	provide JSPort<"Gte">(n1, n2)
+}
+
+Function.Int:Equals (Int n1, Int n2) {
+	provide JSPort<"Equals">(n1, n2)
+}
+
+Function.Int:And (Int n1, Int n2) {
+	provide JSPort<"And">(n1, n2)
+}
+
+Function.Int:Nand (Int n1, Int n2) {
+	provide JSPort<"Nand">(n1, n2)
+}
+
+Function.Int:Or (Int n1, Int n2) {
+	provide JSPort<"Or">(n1, n2)
+}
+
+Function.Int:Nor (Int n1, Int n2) {
+	provide JSPort<"Nor">(n1, n2)
+}
+
+Function.Int:Length (Array.Occult array) {
+	provide JSPort<"Length">(array)
+}
+
+Array.Function.Int:Exprts [Lt, Lte, Gt, Gte, Equals, And, Nand, Or, Nor, Length]
+
+provide Exports
