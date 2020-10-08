@@ -1,12 +1,10 @@
-import { readFileSync, stat } from "fs";
+import { readFileSync } from "fs";
 import { Grammar, Parser } from "nearley";
 import Language from "./grammar/grammar";
 import Path from "path";
 import chalk from "chalk";
 
 import { Statement, IFragmentProgram, Misc, Expression, Primitive } from "./interface";
-
-// import FilePort from "./file"
 
 export default class Fragment {
   file: string;
@@ -114,27 +112,39 @@ export default class Fragment {
         case "comment":
           return Fragment.GeneratePrimitive("Occult", 0);
         case "variable_definition":
-          // TODO: Check duplicate keys for records
-          var value = this.resolveExpression(statement.value, frame);
-          if (
-            value.sort.type === "Function" ||
-            value.sort.type === "Array" ||
-            value.sort.type === "Record"
-          ) {
-            // @ts-ignore
-            value.sort = statement.sort;
-          }
-          if (Fragment.CompareTypes(value, statement.sort)) {
-            frame[statement.name] = value;
-            return Fragment.GeneratePrimitive("Occult", 0);
-          } else {
+          if (frame[statement.name]) {
             new FragmentError(
               this,
-              Fragment.ErrorMessage.TypeMiscmatch,
-              `Given value cannot be assignable to '${Fragment.ResolveSort(statement.sort)}'`,
+              Fragment.ErrorMessage.DeclaredVariable,
+              `Variable '${statement.name}' already exists in the frame. You cannot reinstantiate it.`,
               statement.sort.position as Misc.Position
-            ).throw();
+            ).throw(`Maybe reassign it? e.g: ${statement.name} : ...`);
             process.exit();
+          } else {
+            // TODO: Check duplicate keys for records
+            var value = this.resolveExpression(statement.value, frame);
+            if (
+              value.sort.type === "Function" ||
+              value.sort.type === "Array" ||
+              value.sort.type === "Record"
+            ) {
+              // @ts-ignore
+              value.sort = statement.sort;
+            }
+            if (Fragment.CompareTypes(value, statement.sort)) {
+              frame[statement.name] = value;
+              return Fragment.GeneratePrimitive("Occult", 0);
+            } else {
+              new FragmentError(
+                this,
+                Fragment.ErrorMessage.TypeMiscmatch,
+                `Given type '${Fragment.ResolveSort(
+                  value.sort
+                )}' cannot be assignable to '${Fragment.ResolveSort(statement.sort)}'`,
+                statement.sort.position as Misc.Position
+              ).throw();
+              process.exit();
+            }
           }
         case "quantity_modifier":
           var value = this.resolveExpression(statement.statement, frame);
@@ -160,76 +170,95 @@ export default class Fragment {
         case "assign_statement":
           var value = this.resolveExpression(statement.statement, frame);
           var assignmet = this.resolveExpression(statement.value, frame);
-          if (
-            (value.sort.type === "Int" && assignmet.sort.type === "Int") ||
-            (value.sort.type === "Double" && assignmet.sort.type === "Double")
-          ) {
-            let v = ((assignmet as unknown) as Primitive.FragmentIntRepresentation).value;
-            let s = ((value as unknown) as Primitive.FragmentIntRepresentation).value;
-            let condition = (operation: "+" | "-" | "*" | "/") => {
-              switch (operation) {
-                case "+":
-                  return value.sort.type === "Int" ? (s + v) % 1 === 0 : (s + v) % 1 !== 0;
-                case "-":
-                  return value.sort.type === "Int" ? (s - v) % 1 === 0 : (s - v) % 1 !== 0;
-                case "*":
-                  return value.sort.type === "Int" ? (s * v) % 1 === 0 : (s * v) % 1 !== 0;
-                case "/":
-                  return value.sort.type === "Int" ? (s / v) % 1 === 0 : (s / v) % 1 !== 0;
-              }
-            };
 
-            let exit = () => {
+          if (statement.type === "redeclare") {
+            if (Fragment.CompareTypes(value, assignmet.sort)) {
+              // TODO: Consider all types
+              value.value = assignmet.value;
+            } else {
               new FragmentError(
                 this,
                 Fragment.ErrorMessage.TypeMiscmatch,
-                `Type '${value.sort.type}' cannot be reassigned with type '${
-                  value.sort.type === "Double" ? "Int" : "Double"
-                }'`,
+                `Given type '${Fragment.ResolveSort(
+                  assignmet.sort
+                )}' cannot be reassignable to '${Fragment.ResolveSort(value.sort)}'`,
+                statement.statement.position
+              ).throw();
+              process.exit();
+            }
+            return Fragment.GeneratePrimitive("Occult", 0);
+          } else {
+            if (
+              (value.sort.type === "Int" && assignmet.sort.type === "Int") ||
+              (value.sort.type === "Double" && assignmet.sort.type === "Double")
+            ) {
+              let v = ((assignmet as unknown) as Primitive.FragmentIntRepresentation).value;
+              let s = ((value as unknown) as Primitive.FragmentIntRepresentation).value;
+              let condition = (operation: "+" | "-" | "*" | "/") => {
+                switch (operation) {
+                  case "+":
+                    return value.sort.type === "Int" ? (s + v) % 1 === 0 : (s + v) % 1 !== 0;
+                  case "-":
+                    return value.sort.type === "Int" ? (s - v) % 1 === 0 : (s - v) % 1 !== 0;
+                  case "*":
+                    return value.sort.type === "Int" ? (s * v) % 1 === 0 : (s * v) % 1 !== 0;
+                  case "/":
+                    return value.sort.type === "Int" ? (s / v) % 1 === 0 : (s / v) % 1 !== 0;
+                }
+              };
+
+              let exit = () => {
+                new FragmentError(
+                  this,
+                  Fragment.ErrorMessage.TypeMiscmatch,
+                  `Type '${value.sort.type}' cannot be reassigned with type '${
+                    value.sort.type === "Double" ? "Int" : "Double"
+                  }'`,
+                  statement.statement.position as Misc.Position
+                ).throw();
+                process.exit();
+              };
+
+              switch (statement.type) {
+                case "increment":
+                  if (condition("+")) {
+                    ((value as unknown) as Primitive.FragmentIntRepresentation).value += v;
+                  } else {
+                    exit();
+                  }
+                  break;
+                case "decrement":
+                  if (condition("-")) {
+                    ((value as unknown) as Primitive.FragmentIntRepresentation).value -= v;
+                  } else {
+                    exit();
+                  }
+                  break;
+                case "multiply":
+                  if (condition("*")) {
+                    ((value as unknown) as Primitive.FragmentIntRepresentation).value *= v;
+                  } else {
+                    exit();
+                  }
+                  break;
+                case "divide":
+                  if (condition("/")) {
+                    ((value as unknown) as Primitive.FragmentIntRepresentation).value /= v;
+                  } else {
+                    exit();
+                  }
+              }
+            } else {
+              new FragmentError(
+                this,
+                Fragment.ErrorMessage.TypeMiscmatch,
+                `Type '${value.sort.type}' cannot be reassigned with type '${assignmet.sort.type}'`,
                 statement.statement.position as Misc.Position
               ).throw();
               process.exit();
-            };
-
-            switch (statement.type) {
-              case "increment":
-                if (condition("+")) {
-                  ((value as unknown) as Primitive.FragmentIntRepresentation).value += v;
-                } else {
-                  exit();
-                }
-                break;
-              case "decrement":
-                if (condition("-")) {
-                  ((value as unknown) as Primitive.FragmentIntRepresentation).value -= v;
-                } else {
-                  exit();
-                }
-                break;
-              case "multiply":
-                if (condition("*")) {
-                  ((value as unknown) as Primitive.FragmentIntRepresentation).value *= v;
-                } else {
-                  exit();
-                }
-                break;
-              case "divide":
-                if (condition("/")) {
-                  ((value as unknown) as Primitive.FragmentIntRepresentation).value /= v;
-                } else {
-                  exit();
-                }
             }
-          } else {
-            new FragmentError(
-              this,
-              Fragment.ErrorMessage.TypeMiscmatch,
-              `Type '${value.sort.type}' cannot be reassigned with type '${assignmet.sort.type}'`,
-              statement.statement.position as Misc.Position
-            ).throw();
-            process.exit();
+            return Fragment.GeneratePrimitive("Occult", 0);
           }
-          return Fragment.GeneratePrimitive("Int", 0);
         case "if_statement":
           let condition = this.resolveExpression(statement.condition, frame);
 
@@ -637,6 +666,7 @@ export default class Fragment {
     UnknownType: "Unknown type is found while resolving the primitive",
     UnknownStatement: "Unknown statement is found while resolving the statement",
     UndeclaredVariable: "Undeclared variable is found while resolving an expression",
+    DeclaredVariable: "Already declared variable is found while resolving an expression",
     UnindexableType: "Cannot index this construct with given type",
     UndeclaredElement: "Undeclared element is found while resolving an expression",
     UnperformableArithmetic: "Cannot perform arithmetic between these types",
@@ -850,8 +880,7 @@ class FragmentError {
     public position: Misc.Position
   ) {}
 
-  throw() {
-    console.log(this.punchline);
+  throw(tip?: string) {
     let line = this.instance.content.split("\n")[this.position.line - 1];
     let t = (line.match(/\t/g) || []).length;
     let spaces = Array(this.position.col - (t > 0 ? t + 1 : 0)).join(" ");
@@ -866,7 +895,7 @@ class FragmentError {
         chalk
           .hex("#1793ff")
           .bold(`${this.instance.file} ${this.position.line}:${this.position.col}`)
-      }`
+      }${tip ? `\n\n${tip}` : ""}`
     );
   }
 }

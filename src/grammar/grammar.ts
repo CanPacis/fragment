@@ -2,7 +2,6 @@
 // Generated automatically by nearley, version 2.19.7
 // http://github.com/Hardmath123/nearley
 // Bypasses TS6133. Allow declared but unused functions.
-// @ts-ignore
 function id(d: any[]): any { return d[0]; }
 declare var NumberLiteral: any;
 declare var StringLiteral: any;
@@ -167,6 +166,7 @@ const grammar: Grammar = {
     {"name": "AssignStatement", "symbols": ["VariableReference", "_", {"literal":":"}, {"literal":"-"}, "_", "MainExpression"], "postprocess": d => ({ operation: "assign_statement", type: "decrement", statement: d[0], value: d[5] })},
     {"name": "AssignStatement", "symbols": ["VariableReference", "_", {"literal":":"}, {"literal":"*"}, "_", "MainExpression"], "postprocess": d => ({ operation: "assign_statement", type: "multiply", statement: d[0], value: d[5] })},
     {"name": "AssignStatement", "symbols": ["VariableReference", "_", {"literal":":"}, {"literal":"/"}, "_", "MainExpression"], "postprocess": d => ({ operation: "assign_statement", type: "divide", statement: d[0], value: d[5] })},
+    {"name": "AssignStatement", "symbols": ["VariableReference", "_", {"literal":":"}, "_", "MainExpression"], "postprocess": d => ({ operation: "assign_statement", type: "redeclare", statement: d[0], value: d[4] })},
     {"name": "VariableDeclaration", "symbols": ["variable_type", {"literal":":"}, "identifier", "__", "MainExpression"], "postprocess":  d => ({ 
           operation: "variable_definition", 
           sort: d[0],

@@ -1,10 +1,7 @@
-use [ReadFile] from "file.fr"
+Array.Int:age [10]
 
-Array.String:test [ReadFile("./file.fr")]
+Print(age<0>)
 
-Record.String:test2 {
-	"ali": "Ali",
-	"veli": "Veli"
-}
+age<0>++
 
-Print(test2<"ali">)
+Print(age<0>)

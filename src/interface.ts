@@ -210,7 +210,7 @@ export namespace Statement {
 
   export interface Assign {
     operation: "assign_statement";
-    type: "increment" | "decrement" | "multiply" | "divide";
+    type: "increment" | "decrement" | "multiply" | "divide" | "redeclare";
     statement: Expression.Reference;
     value: Expression.All;
   }

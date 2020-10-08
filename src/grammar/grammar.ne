@@ -144,6 +144,8 @@ AssignStatement
   {% d => ({ operation: "assign_statement", type: "multiply", statement: d[0], value: d[5] }) %}
   | VariableReference _ ":" "/" _ MainExpression 
   {% d => ({ operation: "assign_statement", type: "divide", statement: d[0], value: d[5] }) %}
+  | VariableReference _ ":" _ MainExpression 
+  {% d => ({ operation: "assign_statement", type: "redeclare", statement: d[0], value: d[4] }) %}
 
 VariableDeclaration -> variable_type ":" identifier __ MainExpression
   {% d => ({ 
