@@ -45,3 +45,15 @@ Function.Occult:Print (Occult message) {
 Function.String:Type (Occult data) {
 	provide JSPort<"Type">(data)
 }
+
+Function.Int:ToInt (String string) {
+	provide JSPort<"ToInt">(string)
+}
+
+Function.String:ToString (Occult data) {
+	provide JSPort<"ToString">(data)
+}
+
+Function.Boolean:ToBoolean (Occult data) {
+	provide JSPort<"ToBoolean">(data)
+}

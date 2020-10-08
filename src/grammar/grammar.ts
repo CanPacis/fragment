@@ -1,7 +1,7 @@
-// @ts-nocheck
 // Generated automatically by nearley, version 2.19.7
 // http://github.com/Hardmath123/nearley
 // Bypasses TS6133. Allow declared but unused functions.
+// @ts-ignore
 function id(d: any[]): any { return d[0]; }
 declare var NumberLiteral: any;
 declare var StringLiteral: any;
@@ -160,8 +160,8 @@ const grammar: Grammar = {
           body: d[8],
           position: position(d) 
         }) },
-    {"name": "QuantityModifier", "symbols": ["VariableReference", {"literal":"+"}, {"literal":"+"}], "postprocess": d => ({ operation: "quantity_modifier", type: "increment", statement: d[0] })},
-    {"name": "QuantityModifier", "symbols": ["VariableReference", {"literal":"-"}, {"literal":"-"}], "postprocess": d => ({ operation: "quantity_modifier", type: "decrement", statement: d[0] })},
+    {"name": "QuantityModifier", "symbols": ["MainExpression", {"literal":"+"}, {"literal":"+"}], "postprocess": d => ({ operation: "quantity_modifier", type: "increment", statement: d[0] })},
+    {"name": "QuantityModifier", "symbols": ["MainExpression", {"literal":"-"}, {"literal":"-"}], "postprocess": d => ({ operation: "quantity_modifier", type: "decrement", statement: d[0] })},
     {"name": "AssignStatement", "symbols": ["VariableReference", "_", {"literal":":"}, {"literal":"+"}, "_", "MainExpression"], "postprocess": d => ({ operation: "assign_statement", type: "increment", statement: d[0], value: d[5] })},
     {"name": "AssignStatement", "symbols": ["VariableReference", "_", {"literal":":"}, {"literal":"-"}, "_", "MainExpression"], "postprocess": d => ({ operation: "assign_statement", type: "decrement", statement: d[0], value: d[5] })},
     {"name": "AssignStatement", "symbols": ["VariableReference", "_", {"literal":":"}, {"literal":"*"}, "_", "MainExpression"], "postprocess": d => ({ operation: "assign_statement", type: "multiply", statement: d[0], value: d[5] })},

@@ -1,7 +1,5 @@
-Array.Int:age [10]
+String:s "b"
 
-Print(age<0>)
+Int:n ToInt(s)
 
-age<0>++
-
-Print(age<0>)
+Print(n)

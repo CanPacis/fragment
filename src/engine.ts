@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { Grammar, Parser } from "nearley";
 import Language from "./grammar/grammar";
-import Path from "path";
+import Path, { parse } from "path";
 import chalk from "chalk";
 
 import { Statement, IFragmentProgram, Misc, Expression, Primitive } from "./interface";
@@ -140,7 +140,7 @@ export default class Fragment {
                 Fragment.ErrorMessage.TypeMiscmatch,
                 `Given type '${Fragment.ResolveSort(
                   value.sort
-                )}' cannot be assignable to '${Fragment.ResolveSort(statement.sort)}'`,
+                )}' cannot be assigned to '${Fragment.ResolveSort(statement.sort)}'`,
                 statement.sort.position as Misc.Position
               ).throw();
               process.exit();
@@ -181,7 +181,7 @@ export default class Fragment {
                 Fragment.ErrorMessage.TypeMiscmatch,
                 `Given type '${Fragment.ResolveSort(
                   assignmet.sort
-                )}' cannot be reassignable to '${Fragment.ResolveSort(value.sort)}'`,
+                )}' cannot be reassigned to '${Fragment.ResolveSort(value.sort)}'`,
                 statement.statement.position
               ).throw();
               process.exit();
@@ -849,6 +849,64 @@ export default class Fragment {
         sort: { type: "Function", of: { type: "String" } },
         cb(value: Primitive.AllRepresentation) {
           return Fragment.GeneratePrimitive("String", Fragment.ResolveSort(value.sort));
+        },
+      } as unknown) as Primitive.NativeFunctionRepresentation,
+    },
+    // ToInt Function
+    {
+      key: Fragment.GeneratePrimitive("String", "ToInt"),
+      value: ({
+        body: [],
+        parameters: [],
+        provides: {},
+        native: true,
+        sort: { type: "Function", of: { type: "Int" } },
+        cb: (data: Primitive.AllRepresentation) => {
+          if (data.sort.type === "String") {
+            let parsed = parseInt((data as Primitive.FragmentStringRepresentation).value);
+            
+            if (parsed.toString() !== "NaN") {
+              return Fragment.GeneratePrimitive("Int", parsed);
+            }else {
+              // TODO: Add errors
+              console.log("Bu ne amk")
+              // new FragmentError(this, "", ``, { line: 1, col: 1 }).throw()
+              process.exit()
+            }
+          } else {
+          }
+        },
+      } as unknown) as Primitive.NativeFunctionRepresentation,
+    },
+    // ToString Function
+    {
+      key: Fragment.GeneratePrimitive("String", "ToString"),
+      value: ({
+        body: [],
+        parameters: [],
+        provides: {},
+        native: true,
+        sort: { type: "Function", of: { type: "String" } },
+        cb(value: Primitive.FragmentStringRepresentation) {
+          return Fragment.GeneratePrimitive("String", Fragment.SerializePrimitive(value));
+        },
+      } as unknown) as Primitive.NativeFunctionRepresentation,
+    },
+    // ToBoolean Function
+    {
+      key: Fragment.GeneratePrimitive("String", "ToBoolean"),
+      value: ({
+        body: [],
+        parameters: [],
+        provides: {},
+        native: true,
+        sort: { type: "Function", of: { type: "Boolean" } },
+        cb(data: Primitive.FragmentStringRepresentation | Primitive.FragmentNumberRepresentation) {
+          if (data.value === 0 || data.value === "false") {
+            return Fragment.GeneratePrimitive("Boolean", false);
+          } else if (data.value === 1 || data.value === "true") {
+            return Fragment.GeneratePrimitive("Boolean", true);
+          }
         },
       } as unknown) as Primitive.NativeFunctionRepresentation,
     },

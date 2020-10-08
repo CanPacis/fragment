@@ -130,9 +130,9 @@ ForStatement -> "for" __ MainExpression __ "as" __ identifier _ CodeBlock
   }) %}
 
 QuantityModifier 
-  -> VariableReference "+" "+" 
+  -> MainExpression "+" "+" 
     {% d => ({ operation: "quantity_modifier", type: "increment", statement: d[0] }) %}
-  | VariableReference "-" "-"
+  | MainExpression "-" "-"
     {% d => ({ operation: "quantity_modifier", type: "decrement", statement: d[0] }) %}
 
 AssignStatement
