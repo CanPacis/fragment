@@ -1,0 +1,3 @@
+Function.String:ReadFile (String path) {
+	provide FilePort<"ReadFile">(path)
+}

@@ -1,22 +1,10 @@
-# use [array] from "./math.fr"
+use [ReadFile] from "file.fr"
 
+Array.String:test [ReadFile("./file.fr")]
 
+Record.String:test2 {
+	"ali": "Ali",
+	"veli": "Veli"
+}
 
-Array.String:test list<0>()
-
-Print(test) #
-
-#
-Function.Array.Int:name () {
-	provide [5,6,1,12,7]
-} 
-
-
-Array.Function.Array.String:list [name]
-#
-
-# Record.Array.Int:test { "a": [1, 2] } # 
-
-# Record.Int:test { "a": 4 } #
-
-Array.Array.Array.Array.Int:test [[[[2]]]]
+Print(test2<"ali">)
