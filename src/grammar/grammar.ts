@@ -144,7 +144,8 @@ const grammar: Grammar = {
     {"name": "EmbodyStatement", "symbols": [{"literal":"embody"}, "__", "Expression", "_", {"literal":"{"}, "EmbodyStatement$ebnf$1", {"literal":"}"}], "postprocess":  d => ({ 
           operation: "embody_statement", 
           name: d[2], 
-          arguments: d[5]?.flat(Number.POSITIVE_INFINITY) || []
+          arguments: d[5]?.flat(Number.POSITIVE_INFINITY) || [],
+          position: position(d)
         }) },
     {"name": "IfStatement", "symbols": [{"literal":"if"}, "__", "MainExpression", "_", "FunctionCodeBlock"], "postprocess":  d => ({ 
           operation: "if_statement", 
@@ -172,8 +173,9 @@ const grammar: Grammar = {
           sort: d[0],
           name: d[2].value, 
           value: d[4],
+          position: position(d)
         }) },
-    {"name": "IndexGetter", "symbols": ["MainExpression", {"literal":"<"}, "MainExpression", {"literal":">"}], "postprocess": d => ({ operation: "index_statement", source: d[0], index: d[2] })},
+    {"name": "IndexGetter", "symbols": ["MainExpression", {"literal":"<"}, "MainExpression", {"literal":">"}], "postprocess": d => ({ operation: "index_statement", source: d[0], index: d[2], position: d[0].position })},
     {"name": "Expression", "symbols": ["Primitive"], "postprocess": id},
     {"name": "Expression", "symbols": ["FunctionCall"], "postprocess": id},
     {"name": "Expression", "symbols": ["VariableReference"], "postprocess": id},
@@ -190,12 +192,14 @@ const grammar: Grammar = {
     {"name": "FunctionCall", "symbols": ["Expression", "_", {"literal":"("}, "FunctionCall$ebnf$1", {"literal":")"}], "postprocess":  d => ({ 
           operation: "function_call", 
           name: d[0], 
-          arguments: d[3]?.flat(Number.POSITIVE_INFINITY) || []
+          arguments: d[3]?.flat(Number.POSITIVE_INFINITY) || [],
+          position: d[0].position
         }) },
     {"name": "FunctionCall", "symbols": [{"literal":"&"}, "Expression"], "postprocess":  d => ({ 
           operation: "function_call", 
           name: d[1], 
           arguments: [],
+          position: d[0].position
         }) },
     {"name": "MainExpression", "symbols": ["MainExpression", "_", {"literal":"+"}, "_", "MultDiv"], "postprocess": d => arithmetic("addition", d)},
     {"name": "MainExpression", "symbols": ["MainExpression", "_", {"literal":"-"}, "_", "MultDiv"], "postprocess": d => arithmetic("subtraction", d)},

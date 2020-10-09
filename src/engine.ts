@@ -1,10 +1,17 @@
 import { readFileSync } from "fs";
 import { Grammar, Parser } from "nearley";
 import Language from "./grammar/grammar";
-import Path, { parse } from "path";
+import Path from "path";
 import chalk from "chalk";
 
-import { Statement, IFragmentProgram, Misc, Expression, Primitive } from "./interface";
+import {
+  Statement,
+  IFragmentProgram,
+  Misc,
+  Expression,
+  Primitive,
+  PortFunction,
+} from "./interface";
 
 export default class Fragment {
   file: string;
@@ -40,7 +47,7 @@ export default class Fragment {
     }
   }
 
-  run(libraries: string[] = [], includeSystem: Boolean = true) {
+  run(libraries: PortFunction = () => [], includeSystem: Boolean = true) {
     if (includeSystem) {
       let system = new Fragment(Path.join(process.cwd(), "src/fragment/system.fr"));
 
@@ -49,22 +56,24 @@ export default class Fragment {
       this.frame = { ...this.frame, ...system.frame };
     }
 
-    this.resolveProgram();
+    this.resolveProgram(libraries);
   }
 
-  resolveProgram() {
+  resolveProgram(libraries: PortFunction = () => []) {
     if (this.type === "system") {
       this.frame.JSPort = {
         sort: { type: "Record", of: { type: "Occult" } },
         values: Fragment.Port,
       };
     }
-    this.frame.FilePort = {
-      sort: { type: "Record", of: { type: "Occult" } },
-      values: this.FilePort,
-    };
 
     this.resolveDependencies();
+    
+    this.frame = {
+      ...this.frame,
+      System: { sort: { type: "Record", of: { type: "Occult" } }, values: libraries(this) },
+    };
+    
     this.parsedContent.program.forEach((statement) => {
       this.resolveStatement(statement, this.frame);
     });
@@ -72,35 +81,46 @@ export default class Fragment {
 
   resolveDependencies() {
     this.parsedContent.uses.forEach((dependency) => {
-      if (dependency.source === "system") {
-        console.log("system import");
-      } else {
-        let instance = new Fragment(Path.join(this.parsedPath.dir, dependency.source));
-        instance.run();
-        this.dependencies.push(instance);
-        let subframe: Misc.Frame = {};
-
-        if (dependency.use === "All") {
-          subframe = instance.frame;
-        } else {
-          dependency.use.forEach((use) => {
-            let value = instance.frame[use];
-            if (value) {
-              subframe[use] = value;
-            } else {
-              new FragmentError(
-                this,
-                Fragment.ErrorMessage.UndeclaredVariable,
-                `Use statement is trying to use a variable that is not provided. Variable '${use}' is not usable`,
-                dependency.position
-              ).throw();
-              process.exit();
-            }
-          });
-        }
-        this.frame = { ...this.frame, ...subframe };
+      switch (dependency.source) {
+        case "file":
+          this.addDependency({ ...dependency, source: "./src/fragment/file.fr" }, false);
+          break;
+        default:
+          this.addDependency(dependency);
+          break;
       }
     });
+  }
+
+  addDependency(dependency: Statement.Use, checkPath = true) {
+    let instance = new Fragment(
+      checkPath
+        ? Path.join(this.parsedPath.dir, dependency.source)
+        : Path.resolve(dependency.source)
+    );
+    instance.run();
+    this.dependencies.push(instance);
+    let subframe: Misc.Frame = {};
+
+    if (dependency.use === "All") {
+      subframe = instance.frame;
+    } else {
+      dependency.use.forEach((use) => {
+        let value = instance.frame[use];
+        if (value) {
+          subframe[use] = value;
+        } else {
+          new FragmentError(
+            this,
+            Fragment.ErrorMessage.UndeclaredVariable,
+            `Use statement is trying to use a variable that is not provided. Variable '${use}' is not usable`,
+            dependency.position
+          ).throw();
+          process.exit();
+        }
+      });
+    }
+    this.frame = { ...this.frame, ...subframe };
   }
 
   resolveStatement(statement: Statement.All, frame: Misc.Frame): Primitive.AllRepresentation {
@@ -124,9 +144,9 @@ export default class Fragment {
             // TODO: Check duplicate keys for records
             var value = this.resolveExpression(statement.value, frame);
             if (
-              value.sort.type === "Function" ||
-              value.sort.type === "Array" ||
-              value.sort.type === "Record"
+              (value.sort.type === "Function" && statement.sort.type === "Function") ||
+              (value.sort.type === "Array" && statement.sort.type === "Array") ||
+              (value.sort.type === "Record" && statement.sort.type === "Record")
             ) {
               // @ts-ignore
               value.sort = statement.sort;
@@ -461,7 +481,7 @@ export default class Fragment {
 
           let args = expression.arguments.map((arg) => this.resolveExpression(arg, frame));
           if ((name as Primitive.NativeFunctionRepresentation).native) {
-            return (name as Primitive.NativeFunctionRepresentation).cb(...args);
+            return (name as Primitive.NativeFunctionRepresentation).cb(args, expression, args);
           } else {
             let subframe = { ...frame };
             name.parameters.forEach((param, i) => {
@@ -659,7 +679,15 @@ export default class Fragment {
   }
 
   static GeneratePrimitive(type: Misc.Type, value: any): Primitive.AllRepresentation {
-    return { sort: { type }, value };
+    if (type === "Function") {
+      return {
+        native: true,
+        sort: { type: "Function", of: { type: "Occult" } },
+        cb: value,
+      };
+    } else {
+      return { sort: { type }, value };
+    }
   }
 
   static ErrorMessage = {
@@ -674,7 +702,9 @@ export default class Fragment {
     TypeMiscmatch: "There is a type mismatch in given program",
     DuplicateElement: "There is duplicate of an element in given program",
     AnticipatedArgument: "A function anticipated an argument",
-    SyntaxError: "There is a syntax error in give program",
+    UnableToFindPath: "Could not find the path you are referring to",
+    UnknownError: "An error occured that we are not sure what",
+    SyntaxError: "There is a syntax error in given program",
   };
 
   static SerializePrimitive(primitive: Primitive.AllRepresentation): string {
@@ -729,208 +759,136 @@ export default class Fragment {
     // Print Function
     {
       key: Fragment.GeneratePrimitive("String", "Print"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Occult" } },
-        cb(...input: Primitive.AllRepresentation[]) {
-          let message: string[] = [];
-          input.forEach((msg) => {
-            message.push(Fragment.SerializePrimitive(msg));
-          });
-          console.log(message.join(" "));
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+      value: Fragment.GeneratePrimitive("Function", (input: Primitive.AllRepresentation[]) => {
+        let message: string[] = [];
+        input.forEach((msg) => {
+          message.push(Fragment.SerializePrimitive(msg));
+        });
+        console.log(message.join(" "));
+      }),
     },
     // Less Than Function
     {
       key: Fragment.GeneratePrimitive("String", "Lt"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Boolean" } },
-        cb(n1: Primitive.FragmentNumberRepresentation, n2: Primitive.FragmentNumberRepresentation) {
+      value: Fragment.GeneratePrimitive(
+        "Function",
+        ([n1, n2]: Primitive.FragmentNumberRepresentation[]) => {
           return n1.value < n2.value
             ? Fragment.GeneratePrimitive("Boolean", true)
             : Fragment.GeneratePrimitive("Boolean", false);
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+        }
+      ),
     },
     // Less Than or Equals Function
     {
       key: Fragment.GeneratePrimitive("String", "Lte"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Boolean" } },
-        cb(n1: Primitive.FragmentNumberRepresentation, n2: Primitive.FragmentNumberRepresentation) {
+      value: Fragment.GeneratePrimitive(
+        "Function",
+        ([n1, n2]: Primitive.FragmentNumberRepresentation[]) => {
           return n1.value <= n2.value
             ? Fragment.GeneratePrimitive("Boolean", true)
             : Fragment.GeneratePrimitive("Boolean", false);
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+        }
+      ),
     },
     // Greater Than Function
     {
       key: Fragment.GeneratePrimitive("String", "Gt"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Boolean" } },
-        cb(n1: Primitive.FragmentNumberRepresentation, n2: Primitive.FragmentNumberRepresentation) {
+      value: Fragment.GeneratePrimitive(
+        "Function",
+        ([n1, n2]: Primitive.FragmentNumberRepresentation[]) => {
           return n1.value > n2.value
             ? Fragment.GeneratePrimitive("Boolean", true)
             : Fragment.GeneratePrimitive("Boolean", false);
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+        }
+      ),
     },
     // Greater Than or Equals Function
     {
       key: Fragment.GeneratePrimitive("String", "Gte"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Boolean" } },
-        cb(n1: Primitive.FragmentNumberRepresentation, n2: Primitive.FragmentNumberRepresentation) {
+      value: Fragment.GeneratePrimitive(
+        "Function",
+        ([n1, n2]: Primitive.FragmentNumberRepresentation[]) => {
           return n1.value >= n2.value
             ? Fragment.GeneratePrimitive("Boolean", true)
             : Fragment.GeneratePrimitive("Boolean", false);
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+        }
+      ),
     },
     // Equals to Function
     {
       key: Fragment.GeneratePrimitive("String", "Equals"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Boolean" } },
-        cb(n1: Primitive.FragmentNumberRepresentation, n2: Primitive.FragmentNumberRepresentation) {
+      value: Fragment.GeneratePrimitive(
+        "Function",
+        ([n1, n2]: Primitive.FragmentNumberRepresentation[]) => {
           return n1.value === n2.value
             ? Fragment.GeneratePrimitive("Boolean", true)
             : Fragment.GeneratePrimitive("Boolean", false);
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+        }
+      ),
     },
     // Length Function
     {
       key: Fragment.GeneratePrimitive("String", "Length"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Int" } },
-        cb(array: Primitive.FragmentArrayRepresentation) {
+      value: Fragment.GeneratePrimitive(
+        "Function",
+        ([array]: Primitive.FragmentArrayRepresentation[]) => {
           return Fragment.GeneratePrimitive("Int", array.values.length);
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+        }
+      ),
     },
     // Type Function
     {
       key: Fragment.GeneratePrimitive("String", "Type"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "String" } },
-        cb(value: Primitive.AllRepresentation) {
-          return Fragment.GeneratePrimitive("String", Fragment.ResolveSort(value.sort));
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+      value: Fragment.GeneratePrimitive("Function", ([value]: Primitive.AllRepresentation[]) => {
+        return Fragment.GeneratePrimitive("String", Fragment.ResolveSort(value.sort));
+      }),
     },
     // ToInt Function
     {
       key: Fragment.GeneratePrimitive("String", "ToInt"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Int" } },
-        cb: (data: Primitive.AllRepresentation) => {
-          if (data.sort.type === "String") {
-            let parsed = parseInt((data as Primitive.FragmentStringRepresentation).value);
-            
-            if (parsed.toString() !== "NaN") {
-              return Fragment.GeneratePrimitive("Int", parsed);
-            }else {
-              // TODO: Add errors
-              console.log("Bu ne amk")
-              // new FragmentError(this, "", ``, { line: 1, col: 1 }).throw()
-              process.exit()
-            }
-          } else {
-          }
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+      value: Fragment.GeneratePrimitive("Function", ([data]: Primitive.AllRepresentation[]) => {
+        let parsed = parseInt((data as Primitive.FragmentStringRepresentation).value);
+
+        if (parsed.toString() !== "NaN") {
+          return Fragment.GeneratePrimitive("Int", parsed);
+        } else {
+          return Fragment.GeneratePrimitive("Occult", 0);
+        }
+      }),
     },
     // ToString Function
     {
       key: Fragment.GeneratePrimitive("String", "ToString"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "String" } },
-        cb(value: Primitive.FragmentStringRepresentation) {
+      value: Fragment.GeneratePrimitive(
+        "Function",
+        ([value]: Primitive.FragmentStringRepresentation[]) => {
           return Fragment.GeneratePrimitive("String", Fragment.SerializePrimitive(value));
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+        }
+      ),
     },
     // ToBoolean Function
     {
       key: Fragment.GeneratePrimitive("String", "ToBoolean"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Boolean" } },
-        cb(data: Primitive.FragmentStringRepresentation | Primitive.FragmentNumberRepresentation) {
+      value: Fragment.GeneratePrimitive(
+        "Function",
+        ([data]: Array<
+          Primitive.FragmentStringRepresentation | Primitive.FragmentNumberRepresentation
+        >) => {
           if (data.value === 0 || data.value === "false") {
             return Fragment.GeneratePrimitive("Boolean", false);
           } else if (data.value === 1 || data.value === "true") {
             return Fragment.GeneratePrimitive("Boolean", true);
+          } else {
+            return Fragment.GeneratePrimitive("Occult", 0);
           }
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
-    },
-  ];
-
-  FilePort = [
-    {
-      key: Fragment.GeneratePrimitive("String", "ReadFile"),
-      value: ({
-        body: [],
-        parameters: [],
-        provides: {},
-        native: true,
-        sort: { type: "Function", of: { type: "Occult" } },
-        cb: (path: Primitive.FragmentStringRepresentation) => {
-          let file = readFileSync(Path.join(this.parsedPath.dir, path.value)).toString();
-          return Fragment.GeneratePrimitive("String", file);
-        },
-      } as unknown) as Primitive.NativeFunctionRepresentation,
+        }
+      ),
     },
   ];
 }
 
-class FragmentError {
+export class FragmentError {
   constructor(
     public instance: Fragment,
     public message: string,

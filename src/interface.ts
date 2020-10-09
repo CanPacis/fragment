@@ -229,3 +229,10 @@ export interface IFragmentProgram {
   program: Statement.All[];
   provides: Expression.All;
 }
+
+export interface Port {
+  key: Primitive.AllRepresentation;
+  value: Primitive.AllRepresentation;
+}
+
+export type PortFunction = (instance: any) => Port[]

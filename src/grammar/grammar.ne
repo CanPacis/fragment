@@ -108,7 +108,8 @@ EmbodyStatement -> "embody" __ Expression _ "{" (ArgumentList _ {% id %}):? "}"
   {% d => ({ 
     operation: "embody_statement", 
     name: d[2], 
-    arguments: d[5]?.flat(Number.POSITIVE_INFINITY) || []
+    arguments: d[5]?.flat(Number.POSITIVE_INFINITY) || [],
+    position: position(d)
   }) %}
 
 IfStatement -> "if" __ MainExpression _ FunctionCodeBlock
@@ -153,10 +154,11 @@ VariableDeclaration -> variable_type ":" identifier __ MainExpression
     sort: d[0],
     name: d[2].value, 
     value: d[4],
+    position: position(d)
   }) %}
 
 IndexGetter -> MainExpression "<" MainExpression ">"
-  {% d => ({ operation: "index_statement", source: d[0], index: d[2] }) %}
+  {% d => ({ operation: "index_statement", source: d[0], index: d[2], position: d[0].position }) %}
 
 Expression
   -> Primitive {% id %}
@@ -177,13 +179,15 @@ FunctionCall
     {% d => ({ 
       operation: "function_call", 
       name: d[0], 
-      arguments: d[3]?.flat(Number.POSITIVE_INFINITY) || []
+      arguments: d[3]?.flat(Number.POSITIVE_INFINITY) || [],
+      position: d[0].position
     }) %}
   | "&" Expression
     {% d => ({ 
       operation: "function_call", 
       name: d[1], 
       arguments: [],
+      position: d[0].position
     }) %}
 
 MainExpression 
